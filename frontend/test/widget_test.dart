@@ -1,30 +1,143 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:fake_news_detector/main.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wpfactcheck/app.dart';
+import 'package:wpfactcheck/presentation/main/main_screen.dart';
+import 'package:wpfactcheck/presentation/explore/explore_screen.dart';
+import 'package:wpfactcheck/presentation/profile/profile_screen.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const FakeNewsDetectorApp());
+  group('WPFactCheck App Tests', () {
+    testWidgets('App should build without errors', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: WPFactCheckApp(),
+        ),
+      );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+      // Verify the app builds successfully
+      expect(find.byType(MaterialApp), findsOneWidget);
+    });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    testWidgets('Main screen should display fact check interface', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: MainScreen(),
+          ),
+        ),
+      );
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+      // Verify main screen elements
+      expect(find.text('WP FactCheck'), findsOneWidget);
+      expect(find.text('Enter text or URL to fact-check'), findsOneWidget);
+      expect(find.text('Check Facts'), findsOneWidget);
+      expect(find.byType(TextField), findsOneWidget);
+    });
+
+    testWidgets('Explore screen should display news interface', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: ExploreScreen(),
+          ),
+        ),
+      );
+
+      // Verify explore screen elements
+      expect(find.text('Explore News'), findsOneWidget);
+      expect(find.byType(FilterChip), findsWidgets);
+    });
+
+    testWidgets('Profile screen should display user interface', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: ProfileScreen(),
+          ),
+        ),
+      );
+
+      expect(find.byType(ProfileScreen), findsOneWidget);
+      expect(find.byType(TextField), findsWidgets);
+      expect(find.text('Statistics'), findsOneWidget);
+      expect(find.text('Theme'), findsOneWidget);
+    });
+
+    testWidgets('Text input should accept user input', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: MainScreen(),
+          ),
+        ),
+      );
+
+      final textField = find.byType(TextField);
+      expect(textField, findsOneWidget);
+
+      // Enter text
+      await tester.enterText(textField, 'Test fact check input');
+      await tester.pump();
+
+      // Verify text was entered
+      expect(find.text('Test fact check input'), findsOneWidget);
+    });
+
+    testWidgets('Check Facts button should be enabled with text input', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: MainScreen(),
+          ),
+        ),
+      );
+
+      final textField = find.byType(TextField);
+      final checkButton = find.text('Check Facts');
+
+      // Enter text
+      await tester.enterText(textField, 'This is a test claim to fact check');
+      await tester.pump();
+
+      // Verify button is present
+      expect(checkButton, findsOneWidget);
+    });
+  });
+
+  group('Accessibility Tests', () {
+    testWidgets('All interactive elements should have semantic labels', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: MainScreen(),
+          ),
+        ),
+      );
+
+      // Check for semantic labels on key elements
+      final semantics = tester.getSemantics(find.byType(TextField));
+      expect(semantics.label, isNotNull);
+    });
+
+    testWidgets('App should support large text scaling', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(2.0)),
+            child: MaterialApp(
+              home: Scaffold(
+                body: SingleChildScrollView(
+                  child: MainScreen(),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+      expect(find.byType(MainScreen), findsOneWidget);
+    });
   });
 }

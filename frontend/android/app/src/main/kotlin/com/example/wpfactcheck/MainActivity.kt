@@ -1,4 +1,4 @@
-package com.example.fakenewsdetector.fake_news_detector
+package com.example.wpfactcheck
 
 import io.flutter.embedding.android.FlutterActivity
 

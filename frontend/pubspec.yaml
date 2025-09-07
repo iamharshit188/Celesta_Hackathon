@@ -1,54 +1,67 @@
-name: fake_news_detector
-description: A multi-modal fake news and deepfake detection app with Perplexity-inspired UX
-
+name: wpfactcheck
+description: "AI-powered fact-checking app by Team WaterPlane"
 publish_to: 'none'
 
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
-  flutter: ">=3.10.0"
+  sdk: ^3.9.0
+  flutter: ">=3.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  share_plus: ^7.0.0
-  
-  # State management
-  provider: ^6.1.1
-  
-  # HTTP client
-  dio: ^5.3.2
-  
-  # UI and navigation
-  cupertino_icons: ^1.0.6
-  
-  # File handling
-  file_picker: ^6.1.1
-  path_provider: ^2.1.1
-  
-  # Media and audio
-  speech_to_text: ^6.6.0
-  flutter_tts: ^3.8.5
-  record: ^4.4.4
-  just_audio: ^0.9.35
-  
-  # Utilities
+
+  # State Management
+  flutter_riverpod: ^2.4.9
+
+  # Navigation
+  go_router: ^14.0.2
+
+  # Storage
+  flutter_secure_storage: ^9.0.0
   shared_preferences: ^2.2.2
-  url_launcher: ^6.2.1
-  intl: ^0.18.1
-  
-  # Logging
-  logger: ^2.0.2
+  sqflite: ^2.3.0
+  path: ^1.8.3
+
+  # Network
+  http: ^1.1.0
+  dio: ^5.4.0
+  connectivity_plus: ^4.0.2
+
+  # UI & Media
+  speech_to_text: ^6.6.0
+  url_launcher: ^6.2.2
+  cached_network_image: ^3.3.0
+  shimmer: ^3.0.0
+  adaptive_theme: ^3.4.1
+  flutter_svg: ^2.0.9
+
+  # Debugging
+  device_preview: ^1.1.0
+
+  # Icons
+  cupertino_icons: ^1.0.2
+
+  # Utilities
+  equatable: ^2.0.5
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.1
+  flutter_lints: ^5.0.0
+  
+  # Testing
+  integration_test:
+    sdk: flutter
+  golden_toolkit: ^0.15.0
 
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
+
+# The following section is specific to Flutter packages.
 flutter:
   uses-material-design: true
-  
+
   assets:
-    - assets/images/
-    - assets/icons/
+    - assets/models/
