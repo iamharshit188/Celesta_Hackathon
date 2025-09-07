@@ -5,19 +5,16 @@ import 'package:wpfactcheck/core/utils/either.dart';
 import 'package:wpfactcheck/data/api_clients/fact_check_api_client.dart';
 import 'package:wpfactcheck/data/models/fact_check_result.dart';
 import 'package:wpfactcheck/domain/repositories/fact_check_repository.dart';
-import 'package:sqflite/sqflite.dart';
 
 class FactCheckRepositoryImpl implements FactCheckRepository {
   final FactCheckApiClient _apiClient;
-  final Database _database;
   final Connectivity _connectivity;
+  final List<FactCheckResult> _memoryCache = [];
 
   FactCheckRepositoryImpl({
     required FactCheckApiClient apiClient,
-    required Database database,
     required Connectivity connectivity,
   }) : _apiClient = apiClient,
-       _database = database,
        _connectivity = connectivity;
 
   @override
@@ -41,8 +38,8 @@ class FactCheckRepositoryImpl implements FactCheckRepository {
         sourceUrl: sourceUrl,
       );
 
-      // Cache the result
-      await _cacheAnalysis(result);
+      // Cache the result in memory
+      _cacheAnalysisInMemory(result);
 
       return Right(result);
     } on ServerException catch (e) {
@@ -89,10 +86,8 @@ class FactCheckRepositoryImpl implements FactCheckRepository {
     int limit = 20,
   }) async {
     try {
-      final analyses = await _getCachedAnalyses(limit: limit);
+      final analyses = _memoryCache.take(limit).toList();
       return Right(analyses);
-    } on CacheException catch (e) {
-      return Left(CacheFailure(message: e.message));
     } catch (e) {
       return Left(UnknownFailure(message: 'Failed to get cached analyses: $e'));
     }
@@ -101,10 +96,8 @@ class FactCheckRepositoryImpl implements FactCheckRepository {
   @override
   Future<Either<Failure, void>> cacheAnalysis(FactCheckResult result) async {
     try {
-      await _cacheAnalysis(result);
+      _cacheAnalysisInMemory(result);
       return const Right(null);
-    } on CacheException catch (e) {
-      return Left(CacheFailure(message: e.message));
     } catch (e) {
       return Left(UnknownFailure(message: 'Failed to cache analysis: $e'));
     }
@@ -113,10 +106,8 @@ class FactCheckRepositoryImpl implements FactCheckRepository {
   @override
   Future<Either<Failure, void>> clearCache() async {
     try {
-      await _database.delete('fact_check_results');
+      _memoryCache.clear();
       return const Right(null);
-    } on CacheException catch (e) {
-      return Left(CacheFailure(message: e.message));
     } catch (e) {
       return Left(UnknownFailure(message: 'Failed to clear cache: $e'));
     }
@@ -166,108 +157,18 @@ class FactCheckRepositoryImpl implements FactCheckRepository {
         modelVersion: 'local-roberta-v1',
       );
 
-      await _cacheAnalysis(mockResult);
+      _cacheAnalysisInMemory(mockResult);
       return Right(mockResult);
     } catch (e) {
       return Left(ModelLoadFailure(message: 'Local model analysis failed: $e'));
     }
   }
 
-  Future<List<FactCheckResult>> _getCachedAnalyses({int limit = 20}) async {
-    try {
-      final List<Map<String, dynamic>> maps = await _database.query(
-        'fact_check_results',
-        orderBy: 'analyzedAt DESC',
-        limit: limit,
-      );
-
-      return maps.map((map) => _mapToFactCheckResult(map)).toList();
-    } catch (e) {
-      throw CacheException(message: 'Failed to get cached analyses: $e');
-    }
-  }
-
-  Future<void> _cacheAnalysis(FactCheckResult result) async {
-    try {
-      final map = _mapFromFactCheckResult(result);
-      await _database.insert(
-        'fact_check_results',
-        map,
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-
-      // Clean up old analyses to maintain cache limit
-      await _cleanupOldAnalyses();
-    } catch (e) {
-      throw CacheException(message: 'Failed to cache analysis: $e');
-    }
-  }
-
-  Future<void> _cleanupOldAnalyses() async {
-    try {
-      // Keep only the latest 20 analyses
-      await _database.execute('''
-        DELETE FROM fact_check_results 
-        WHERE id NOT IN (
-          SELECT id FROM fact_check_results 
-          ORDER BY analyzedAt DESC 
-          LIMIT 20
-        )
-      ''');
-    } catch (e) {
-      throw CacheException(message: 'Failed to cleanup old analyses: $e');
-    }
-  }
-
-  FactCheckResult _mapToFactCheckResult(Map<String, dynamic> map) {
-    return FactCheckResult(
-      id: map['id'],
-      inputText: map['inputText'],
-      sourceUrl: map['sourceUrl'],
-      verdict: _verdictFromString(map['verdict']),
-      confidenceScore: map['confidenceScore'],
-      explanation: map['explanation'],
-      sources: (map['sources'] as String).split(','),
-      keyPoints: (map['keyPoints'] as String).split(','),
-      analyzedAt: DateTime.parse(map['analyzedAt']),
-      isFromCache: map['isFromCache'] == 1,
-      modelVersion: map['modelVersion'],
-    );
-  }
-
-  Map<String, dynamic> _mapFromFactCheckResult(FactCheckResult result) {
-    return {
-      'id': result.id,
-      'inputText': result.inputText,
-      'sourceUrl': result.sourceUrl,
-      'verdict': result.verdict.name,
-      'confidenceScore': result.confidenceScore,
-      'explanation': result.explanation,
-      'sources': result.sources.join(','),
-      'keyPoints': result.keyPoints.join(','),
-      'analyzedAt': result.analyzedAt.toIso8601String(),
-      'isFromCache': result.isFromCache ? 1 : 0,
-      'modelVersion': result.modelVersion,
-    };
-  }
-
-  FactCheckVerdict _verdictFromString(String verdict) {
-    switch (verdict.toLowerCase()) {
-      case 'true':
-      case 'true_':
-        return FactCheckVerdict.true_;
-      case 'false':
-      case 'false_':
-        return FactCheckVerdict.false_;
-      case 'partially_true':
-      case 'partiallytrue':
-        return FactCheckVerdict.partiallyTrue;
-      case 'misleading':
-        return FactCheckVerdict.misleading;
-      case 'satire':
-        return FactCheckVerdict.satire;
-      default:
-        return FactCheckVerdict.unverified;
+  void _cacheAnalysisInMemory(FactCheckResult result) {
+    _memoryCache.insert(0, result);
+    // Keep only the latest 20 analyses
+    if (_memoryCache.length > 20) {
+      _memoryCache.removeRange(20, _memoryCache.length);
     }
   }
 }

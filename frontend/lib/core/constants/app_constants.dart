@@ -5,6 +5,13 @@ class AppConstants {
   static const String teamName = 'Team WaterPlane';
 
   // API Configuration
+  static const String backendBaseUrl = 'http://localhost:8000/api/v1';
+  static const String factCheckBaseUrl = '$backendBaseUrl/fact-check';
+  static const String newsBaseUrl = '$backendBaseUrl/news';
+  static const String chatBaseUrl = '$backendBaseUrl/chat';
+  static const String usersBaseUrl = '$backendBaseUrl/users';
+  
+  // External APIs
   static const String newsApiBaseUrl = 'https://newsapi.org/v2';
   static const String newsApiCountry = 'in';
   static const int newsApiPageSize = 20;

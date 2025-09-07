@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:wpfactcheck/core/constants/app_constants.dart';
 import 'package:wpfactcheck/core/utils/extensions.dart';
 import 'package:wpfactcheck/data/models/fact_check_result.dart';
+import 'package:wpfactcheck/presentation/chat/chat_screen.dart';
 
 class FactCheckResultSheet extends StatelessWidget {
   final FactCheckResult? result;
@@ -234,7 +235,245 @@ class FactCheckResultSheet extends StatelessWidget {
   }
 
   Widget _buildResultContent(BuildContext context, ScrollController scrollController) {
-    // TODO: Implement actual result content when result is provided
-    return _buildMockContent(context, scrollController);
+    if (result == null) {
+      return _buildMockContent(context, scrollController);
+    }
+
+    return SingleChildScrollView(
+      controller: scrollController,
+      padding: const EdgeInsets.all(AppConstants.gridSpacing * 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppConstants.gridSpacing),
+                decoration: BoxDecoration(
+                  color: _getVerdictColor(result!.verdict).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+                ),
+                child: Icon(
+                  _getVerdictIcon(result!.verdict),
+                  color: _getVerdictColor(result!.verdict),
+                  size: AppConstants.iconSize,
+                ),
+              ),
+              const SizedBox(width: AppConstants.gridSpacing * 2),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _getVerdictText(result!.verdict),
+                      style: context.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      'Confidence: ${(result!.confidenceScore * 100).toInt()}%',
+                      style: context.textTheme.bodyMedium?.copyWith(
+                        color: context.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: AppConstants.gridSpacing * 3),
+          
+          // Explanation
+          Text(
+            'Analysis',
+            style: context.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: AppConstants.gridSpacing),
+          Text(
+            result!.explanation,
+            style: context.textTheme.bodyLarge,
+          ),
+          
+          const SizedBox(height: AppConstants.gridSpacing * 3),
+          
+          // Key Points
+          if (result!.keyPoints.isNotEmpty) ...[
+            Text(
+              'Key Points',
+              style: context.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: AppConstants.gridSpacing),
+            ...result!.keyPoints.map((point) => Padding(
+              padding: const EdgeInsets.only(bottom: AppConstants.gridSpacing / 2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '•',
+                    style: context.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: context.colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: AppConstants.gridSpacing),
+                  Expanded(
+                    child: Text(
+                      point,
+                      style: context.textTheme.bodyMedium,
+                    ),
+                  ),
+                ],
+              ),
+            )),
+            
+            const SizedBox(height: AppConstants.gridSpacing * 3),
+          ],
+          
+          // Sources
+          if (result!.sources.isNotEmpty) ...[
+            Text(
+              'Sources',
+              style: context.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: AppConstants.gridSpacing),
+            ...result!.sources.map((source) => Padding(
+              padding: const EdgeInsets.only(bottom: AppConstants.gridSpacing / 2),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.link,
+                    size: 16,
+                    color: context.colorScheme.primary,
+                  ),
+                  const SizedBox(width: AppConstants.gridSpacing),
+                  Expanded(
+                    child: Text(
+                      source,
+                      style: context.textTheme.bodyMedium?.copyWith(
+                        color: context.colorScheme.primary,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )),
+            
+            const SizedBox(height: AppConstants.gridSpacing * 3),
+          ],
+          
+          // Actions
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    // TODO: Implement share functionality
+                  },
+                  icon: const Icon(Icons.share),
+                  label: const Text('Share'),
+                ),
+              ),
+              const SizedBox(width: AppConstants.gridSpacing),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: result != null ? () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => ChatScreen(factCheckResult: result!),
+                      ),
+                    );
+                  } : null,
+                  icon: const Icon(Icons.chat),
+                  label: const Text('Chat'),
+                ),
+              ),
+              const SizedBox(width: AppConstants.gridSpacing),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    // TODO: Implement save functionality
+                  },
+                  icon: const Icon(Icons.bookmark),
+                  label: const Text('Save'),
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: AppConstants.gridSpacing * 2),
+          
+          // Footer
+          Center(
+            child: Text(
+              'Analysis completed • ${result!.analyzedAt.timeAgo}',
+              style: context.textTheme.bodySmall?.copyWith(
+                color: context.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getVerdictColor(FactCheckVerdict verdict) {
+    switch (verdict) {
+      case FactCheckVerdict.true_:
+        return Colors.green;
+      case FactCheckVerdict.false_:
+        return Colors.red;
+      case FactCheckVerdict.partiallyTrue:
+        return Colors.orange;
+      case FactCheckVerdict.misleading:
+        return Colors.deepOrange;
+      case FactCheckVerdict.satire:
+        return Colors.purple;
+      case FactCheckVerdict.unverified:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getVerdictIcon(FactCheckVerdict verdict) {
+    switch (verdict) {
+      case FactCheckVerdict.true_:
+        return Icons.check_circle;
+      case FactCheckVerdict.false_:
+        return Icons.cancel;
+      case FactCheckVerdict.partiallyTrue:
+        return Icons.warning_amber;
+      case FactCheckVerdict.misleading:
+        return Icons.error;
+      case FactCheckVerdict.satire:
+        return Icons.theater_comedy;
+      case FactCheckVerdict.unverified:
+        return Icons.help;
+    }
+  }
+
+  String _getVerdictText(FactCheckVerdict verdict) {
+    switch (verdict) {
+      case FactCheckVerdict.true_:
+        return 'True';
+      case FactCheckVerdict.false_:
+        return 'False';
+      case FactCheckVerdict.partiallyTrue:
+        return 'Partially True';
+      case FactCheckVerdict.misleading:
+        return 'Misleading';
+      case FactCheckVerdict.satire:
+        return 'Satire';
+      case FactCheckVerdict.unverified:
+        return 'Unverified';
+    }
   }
 }

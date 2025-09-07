@@ -6,6 +6,7 @@ import 'package:wpfactcheck/core/constants/app_constants.dart';
 import 'package:wpfactcheck/core/utils/extensions.dart';
 import 'package:wpfactcheck/core/utils/validators.dart';
 import 'package:wpfactcheck/presentation/shared_widgets/fact_check_result_sheet.dart';
+import 'package:wpfactcheck/presentation/providers/fact_check_provider.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
@@ -115,10 +116,14 @@ class _MainScreenState extends ConsumerState<MainScreen>
     HapticFeedback.mediumImpact();
 
     try {
-      // TODO: Implement actual fact-checking logic with providers
-      await Future.delayed(const Duration(seconds: 2)); // Simulate API call
+      // Use actual API call through provider
+      if (Validators.isValidUrl(text)) {
+        await ref.read(factCheckProvider.notifier).analyzeUrl(text);
+      } else {
+        await ref.read(factCheckProvider.notifier).analyzeText(text: text);
+      }
       
-      // Show result sheet
+      // Show result sheet with actual data
       if (mounted) {
         _showResultSheet();
       }
@@ -136,12 +141,13 @@ class _MainScreenState extends ConsumerState<MainScreen>
   }
 
   void _showResultSheet() {
+    final factCheckState = ref.read(factCheckProvider);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => const FactCheckResultSheet(
-        // TODO: Pass actual result data
+      builder: (context) => FactCheckResultSheet(
+        result: factCheckState.result,
       ),
     );
   }
