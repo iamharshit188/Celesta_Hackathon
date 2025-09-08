@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:wpfactcheck/core/constants/app_constants.dart';
-import 'package:wpfactcheck/core/utils/extensions.dart';
+import 'package:wpfactcheck/core/extensions/build_context_extensions.dart';
+import 'package:wpfactcheck/core/extensions/datetime_extensions.dart';
 import 'package:wpfactcheck/data/models/fact_check_result.dart';
 import 'package:wpfactcheck/presentation/chat/chat_screen.dart';
 
@@ -11,6 +13,18 @@ class FactCheckResultSheet extends StatelessWidget {
     super.key,
     this.result,
   });
+
+  Future<void> _launchUrl(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      // Handle error silently or show a snackbar
+      debugPrint('Could not launch URL: $url');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -346,24 +360,27 @@ class FactCheckResultSheet extends StatelessWidget {
             const SizedBox(height: AppConstants.gridSpacing),
             ...result!.sources.map((source) => Padding(
               padding: const EdgeInsets.only(bottom: AppConstants.gridSpacing / 2),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.link,
-                    size: 16,
-                    color: context.colorScheme.primary,
-                  ),
-                  const SizedBox(width: AppConstants.gridSpacing),
-                  Expanded(
-                    child: Text(
-                      source,
-                      style: context.textTheme.bodyMedium?.copyWith(
-                        color: context.colorScheme.primary,
-                        decoration: TextDecoration.underline,
+              child: GestureDetector(
+                onTap: () => _launchUrl(source),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.link,
+                      size: 16,
+                      color: context.colorScheme.primary,
+                    ),
+                    const SizedBox(width: AppConstants.gridSpacing),
+                    Expanded(
+                      child: Text(
+                        source,
+                        style: context.textTheme.bodyMedium?.copyWith(
+                          color: context.colorScheme.primary,
+                          decoration: TextDecoration.underline,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             )),
             
