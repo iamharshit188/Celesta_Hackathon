@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shimmer/shimmer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:wpfactcheck/core/constants/app_constants.dart';
-import 'package:wpfactcheck/core/utils/extensions.dart';
-import 'package:wpfactcheck/data/models/news_article.dart';
+import 'package:shimmer/shimmer.dart';
+import '../../data/models/news_models.dart';
+import '../../data/providers/news_provider.dart';
+import '../../core/constants/app_constants.dart';
+import '../../core/utils/extensions.dart';
 
 class ExploreScreen extends ConsumerStatefulWidget {
   const ExploreScreen({super.key});
@@ -16,14 +17,17 @@ class ExploreScreen extends ConsumerStatefulWidget {
 class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   final ScrollController _scrollController = ScrollController();
   String _selectedCategory = 'general';
-  bool _isLoading = false;
-  bool _isLoadingMore = false;
-  List<NewsArticle> _articles = [];
 
   @override
   void initState() {
     super.initState();
-    _loadArticles();
+    // Load initial news
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(newsProvider.notifier).loadNews(
+        category: _selectedCategory,
+        refresh: true,
+      );
+    });
     _scrollController.addListener(_onScroll);
   }
 
@@ -34,100 +38,27 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     }
   }
 
-  Future<void> _loadArticles() async {
-    if (_isLoading) return;
-    
-    setState(() {
-      _isLoading = true;
-      _articles.clear();
-    });
-
-    try {
-      // TODO: Implement actual news loading with providers
-      await Future.delayed(const Duration(seconds: 1));
-      
-      // Mock data for now
-      final mockArticles = _generateMockArticles();
-      
-      if (mounted) {
-        setState(() {
-          _articles = mockArticles;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        context.showErrorSnackBar('Failed to load news: ${e.toString()}');
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
   Future<void> _loadMoreArticles() async {
-    if (_isLoadingMore || _isLoading) return;
-    
+    final newsNotifier = ref.read(newsProvider.notifier);
+    await newsNotifier.loadNews(category: _selectedCategory);
+  }
+
+  Future<void> _refreshNews() async {
+    final newsNotifier = ref.read(newsProvider.notifier);
+    await newsNotifier.loadNews(
+      category: _selectedCategory,
+      refresh: true,
+    );
+  }
+
+  void _onCategoryChanged(String category) {
     setState(() {
-      _isLoadingMore = true;
+      _selectedCategory = category;
     });
-
-    try {
-      await Future.delayed(const Duration(seconds: 1));
-      
-      final moreArticles = _generateMockArticles(startIndex: _articles.length);
-      
-      if (mounted) {
-        setState(() {
-          _articles.addAll(moreArticles);
-          _isLoadingMore = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoadingMore = false;
-        });
-      }
-    }
-  }
-
-  List<NewsArticle> _generateMockArticles({int startIndex = 0}) {
-    final titles = [
-      'Breaking: Major Policy Changes Announced',
-      'Tech Innovation Drives Economic Growth',
-      'Sports Championship Finals This Weekend',
-      'Entertainment Industry Sees Record Profits',
-      'Business Leaders Discuss Future Trends',
-      'Political Debate Sparks National Discussion',
-      'New Research Reveals Surprising Findings',
-      'Local Community Celebrates Achievement',
-    ];
-
-    return List.generate(8, (index) {
-      final actualIndex = startIndex + index;
-      return NewsArticle(
-        id: 'article_$actualIndex',
-        title: titles[index % titles.length],
-        description: 'This is a sample description for article ${actualIndex + 1}. It provides a brief overview of the content.',
-        content: 'Full article content would go here...',
-        url: 'https://example.com/article/$actualIndex',
-        urlToImage: 'https://picsum.photos/400/200?random=$actualIndex',
-        publishedAt: DateTime.now().subtract(Duration(hours: actualIndex)),
-        sourceName: ['Reuters', 'BBC', 'CNN', 'Associated Press'][index % 4],
-        category: _selectedCategory,
-        author: 'Reporter ${index + 1}',
-      );
-    });
-  }
-
-  void _onCategorySelected(String category) {
-    if (category != _selectedCategory) {
-      setState(() {
-        _selectedCategory = category;
-      });
-      _loadArticles();
-    }
+    ref.read(newsProvider.notifier).loadNews(
+      category: category,
+      refresh: true,
+    );
   }
 
   @override
@@ -170,7 +101,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                 return FilterChip(
                   label: Text(category),
                   selected: isSelected,
-                  onSelected: (_) => _onCategorySelected(category.toLowerCase()),
+                  onSelected: (_) => _onCategoryChanged(category.toLowerCase()),
                   backgroundColor: context.colorScheme.surfaceContainerHighest,
                   selectedColor: context.colorScheme.primaryContainer,
                   checkmarkColor: context.colorScheme.onPrimaryContainer,
@@ -181,9 +112,48 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           
           // News list
           Expanded(
-            child: _isLoading 
-                ? _buildShimmerList()
-                : _buildNewsList(),
+            child: Consumer(
+              builder: (context, ref, child) {
+                final newsState = ref.watch(newsProvider);
+                
+                if (newsState.error != null) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 64,
+                          color: context.colorScheme.error,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Failed to load news',
+                          style: context.textTheme.headlineSmall,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          newsState.error!,
+                          style: context.textTheme.bodyMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () => _refreshNews(),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                
+                if (newsState.isLoading && newsState.articles.isEmpty) {
+                  return _buildShimmerList();
+                }
+                
+                return _buildNewsList(newsState);
+              },
+            ),
           ),
         ],
       ),
@@ -240,15 +210,15 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
     );
   }
 
-  Widget _buildNewsList() {
+  Widget _buildNewsList(NewsState newsState) {
     return RefreshIndicator(
-      onRefresh: _loadArticles,
+      onRefresh: _refreshNews,
       child: ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.all(AppConstants.gridSpacing * 2),
-        itemCount: _articles.length + (_isLoadingMore ? 1 : 0),
+        itemCount: newsState.articles.length + (newsState.isLoading ? 1 : 0),
         itemBuilder: (context, index) {
-          if (index == _articles.length) {
+          if (index == newsState.articles.length) {
             return const Center(
               child: Padding(
                 padding: EdgeInsets.all(AppConstants.gridSpacing * 2),
@@ -257,7 +227,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
             );
           }
           
-          final article = _articles[index];
+          final article = newsState.articles[index];
           return _buildArticleCard(article);
         },
       ),

@@ -2,18 +2,26 @@
 Indian news aggregation service using RSS feeds and free APIs
 Provides real-time news feed for the Flutter frontend
 """
-import httpx
-import feedparser
 import asyncio
-from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
+import logging
 import re
-from urllib.parse import urlparse
+from datetime import datetime, timedelta
+from typing import List, Dict, Any, Optional
+import feedparser
+import httpx
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from utils.cache_manager import CacheManager
+from utils.text_processor import TextProcessor
+from services.offline_news_service import OfflineIndianNewsService
 
 class NewsService:
     """Service for aggregating Indian news from multiple sources"""
     
     def __init__(self):
+        self.offline_service = OfflineIndianNewsService()
         self.news_sources = {
             "toi": {
                 "name": "Times of India",
@@ -105,11 +113,23 @@ class NewsService:
             
         except Exception as e:
             print(f"Error fetching headlines: {e}")
-            return {
-                "status": "error",
-                "message": "Failed to fetch news headlines",
-                "articles": []
-            }
+            # Fallback to offline news when RSS feeds fail
+            logger.warning(f"RSS feeds failed, falling back to offline news: {e}")
+            try:
+                offline_articles = self.offline_service.generate_offline_news(category, page_size)
+                return {
+                    "status": "ok",
+                    "totalResults": len(offline_articles),
+                    "articles": offline_articles,
+                    "message": "Showing offline news due to connectivity issues"
+                }
+            except Exception as offline_error:
+                logger.error(f"Offline news generation failed: {offline_error}")
+                return {
+                    "status": "error",
+                    "message": "Failed to fetch news headlines",
+                    "articles": []
+                }
     
     async def search_news(
         self,
@@ -177,11 +197,32 @@ class NewsService:
             
         except Exception as e:
             print(f"Error searching news: {e}")
-            return {
-                "status": "error",
-                "message": "Failed to search news",
-                "articles": []
-            }
+            # Fallback to offline news for search queries
+            logger.warning(f"News search failed, falling back to offline news: {e}")
+            try:
+                offline_articles = self.offline_service.generate_offline_news("general", page_size)
+                # Filter offline articles based on query
+                filtered_offline = []
+                query_lower = query.lower()
+                for article in offline_articles:
+                    title = article.get("title", "").lower()
+                    description = article.get("description", "").lower()
+                    if query_lower in title or query_lower in description:
+                        filtered_offline.append(article)
+                
+                return {
+                    "status": "ok",
+                    "totalResults": len(filtered_offline),
+                    "articles": filtered_offline[:page_size],
+                    "message": "Showing offline search results due to connectivity issues"
+                }
+            except Exception as offline_error:
+                logger.error(f"Offline news search failed: {offline_error}")
+                return {
+                    "status": "error",
+                    "message": "Failed to search news",
+                    "articles": []
+                }
     
     async def _fetch_rss_articles(self, rss_url: str, source_name: str, limit: int = 10) -> List[Dict[str, Any]]:
         """
