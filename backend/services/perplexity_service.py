@@ -15,7 +15,7 @@ class PerplexityService:
     def __init__(self):
         self.api_key = os.getenv("PERPLEXITY_API_KEY")
         self.base_url = "https://api.perplexity.ai/chat/completions"
-        self.model = "sonar"
+        self.model = "sonar-pro"
         
         print(f"🔑 Perplexity API key loaded: {self.api_key[:10]}..." if self.api_key else "❌ No Perplexity API key found")
         
@@ -55,12 +55,14 @@ class PerplexityService:
                         "max_tokens": 1000,
                         "temperature": 0.1,
                         "return_citations": True,
-                        "search_domain_filter": ["in"]  # Focus on Indian sources
+                        "search_domain_filter": ["in"]
                     }
                 )
                 
                 if response.status_code != 200:
-                    raise Exception(f"Perplexity API error: {response.status_code}")
+                    error_text = response.text if hasattr(response, 'text') else str(response.content)
+                    print(f"Perplexity API error {response.status_code}: {error_text}")
+                    raise Exception(f"Perplexity API error: {response.status_code} - {error_text}")
                 
                 result = response.json()
                 return self._parse_perplexity_response(result, text, source_url)
